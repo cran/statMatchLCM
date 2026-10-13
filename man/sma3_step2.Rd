@@ -13,11 +13,8 @@ sma3_step2(step1)
 A list with:
 \describe{
 \item{datA_fused_2}{A data frame containing the final fused version of dataset A.}
-\item{beta_BZ}{A numeric vector of estimated model coefficients.}
-\item{AA_dummy}{A matrix or data frame of dummy variables constructed for dataset A.}
-\item{BB_dummy}{A matrix or data frame of dummy variables constructed for dataset B.}
-\item{prob_Z_all}{A numeric matrix of predicted probabilities for each category of variable Z (rows correspond to observations).}
-\item{zero_one}{A binary matrix (one-hot encoded) sampled from \code{prob_Z_all}, where each row contains a single 1 indicating the selected category of Z.}
+\item{modB}{A multinomial logistic model obtained for dataset datB_imp.}
+\item{zero_one}{A binary matrix (one-hot encoded) sampled from \code{prob_Z_all}, with categories in rows and observations in columns; each column contains a single 1 indicating the selected category of Z.}
 }
 }
 \description{
@@ -28,16 +25,9 @@ to achieve statistically coherent data fusion
 if (requireNamespace("NPBayesImputeCat", quietly = TRUE)) {
   data(datA)
   data(datB)
+  data(datC)
 
-  datAB <- datAB_to_SM(datA, datB)
-  datC <- data.frame(
-    X = datB$X[1:4],
-    Y1 = datA$Y1[1:4],
-    Z1 = datB$Z1[1:4]
-  )
-
-  # adding auxiliary information
-  datABC <- rbind(datAB, datC)
+  datABC <- datABC_to_SM(datA, datB, datC, "color", "targetB")
 
   # call DPMPM (reduced settings for speed)
   output_list_AII <- NPBayesImputeCat::DPMPM_nozeros_imp(
@@ -53,8 +43,9 @@ if (requireNamespace("NPBayesImputeCat", quietly = TRUE)) {
     silent = TRUE
   )
 
-  step_first_aii <- sma_step1(datA, datB, datC, output_list_AII)
-  step_second_aii3 <- sma1_step2(step_first_aii)
+  step_first_aii <- sma_step1(datABC, output_list_AII)
+  set.seed(1234)
+  step_second_aii3 <- sma3_step2(step_first_aii)
 
   result_aii3 <- step_second_aii3$datA_fused_2
   head(result_aii3)

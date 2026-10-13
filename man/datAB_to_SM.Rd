@@ -4,15 +4,19 @@
 \alias{datAB_to_SM}
 \title{Create stacked A/B dataset for MDC}
 \usage{
-datAB_to_SM(datA, datB)
+datAB_to_SM(datA, datB, Y, Z)
 }
 \arguments{
 \item{datA}{data.frame A}
 
 \item{datB}{data.frame B}
+
+\item{Y}{the target variable in datA}
+
+\item{Z}{the target variable in datB}
 }
 \value{
-data.frame with harmonized structure
+data.frame of class() "datAB_SM" with harmonized structure
 }
 \description{
 Creates a joint data set with missing Y1/Z1,
@@ -21,5 +25,5 @@ required for mass data combination.
 \examples{
 data(datA)
 data(datB)
-datAB_to_SM(datA, datB)
+datAB_to_SM(datA, datB, color, targetB)
 }

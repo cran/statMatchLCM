@@ -14,9 +14,9 @@ A list with:
 \describe{
 \item{datA_fused_2}{A data frame containing the final fused (imputed) version of dataset A.}
 \item{out_nnd}{A list with results from the nearest-neighbour distance matching procedure.}
-\item{model_form}{A formula object specifying the model used.}
-\item{FitteddatA_imp1}{A data frame of fitted values obtained for dataset A.}
-\item{FitteddatC_imp1}{A data frame of fitted values obtained for dataset C.}
+\item{match_vars}{Matching variables in the nearest-neighbour distance matching procedure.}
+\item{modA}{A multinomial logistic model obtained for dataset datA_imp.}
+\item{modC}{A multinomial logistic model obtained for dataset datC.}
 }
 }
 \description{
@@ -27,18 +27,11 @@ to improve data fusion accuracy.
 if (requireNamespace("NPBayesImputeCat", quietly = TRUE)) {
   data(datA)
   data(datB)
+  data(datC)
 
-  datAB <- datAB_to_SM(datA, datB)
-  datC <- data.frame(
-    X = datB$X[1:4],
-    Y1 = datA$Y1[1:4],
-    Z1 = datB$Z1[1:4]
-  )
+  datABC <- datABC_to_SM(datA, datB, datC, "color", "targetB")
 
-  # adding auxiliary information
-  datABC <- rbind(datAB, datC)
-
-  output_list_AII <- NPBayesImputeCat::DPMPM_nozeros_imp(
+    output_list_AII <- NPBayesImputeCat::DPMPM_nozeros_imp(
     X = datABC,
     nrun = 50,
     burn = 10,
@@ -51,7 +44,8 @@ if (requireNamespace("NPBayesImputeCat", quietly = TRUE)) {
     silent = TRUE
   )
 
-  step_first_aii <- sma_step1(datA, datB, datC, output_list_AII)
+  step_first_aii <- sma_step1(datABC, output_list_AII)
+  set.seed(1234)
   step_second_aii2 <- sma2_step2(step_first_aii)
 
   result_aii2 <- step_second_aii2$datA_fused_2

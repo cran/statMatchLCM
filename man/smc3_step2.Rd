@@ -13,7 +13,9 @@ smc3_step2(step1)
 A list with:
 \describe{
 \item{datA_fused_2}{A data frame containing the final fused (imputed) version of dataset A.}
-\item{FitteddatA_imp1}{A data frame of fitted values obtained from the model for dataset A.}
+\item{fitA}{A data frame of fitted values obtained from the model for dataset A.}
+\item{model_form}{A formula object used to fit the models.}
+\item{modA}{A multinomial regression model on datA_imp.}
 }
 }
 \description{
@@ -25,7 +27,7 @@ if (requireNamespace("NPBayesImputeCat", quietly = TRUE)) {
   data(datA)
   data(datB)
 
-  datAB <- datAB_to_SM(datA, datB)
+  datAB <- datAB_to_SM(datA, datB, "color", "targetB")
 
   # call DPMPM (reduced settings for speed)
   output_list <- NPBayesImputeCat::DPMPM_nozeros_imp(
@@ -41,7 +43,8 @@ if (requireNamespace("NPBayesImputeCat", quietly = TRUE)) {
     silent = TRUE
   )
 
-  step_first <- smc_step1(datA, datB, output_list)
+  step_first <- smc_step1(datAB, output_list)
+  set.seed(1234)
   step_second <- smc3_step2(step_first)
 
   result <- step_second$datA_fused_2

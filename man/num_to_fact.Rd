@@ -22,3 +22,17 @@ A factor vector:
 Restores a factor variable from numeric codes
 using a mapping table created by \code{fact_to_num()}.
 }
+\examples{
+# Convert factors to numeric codes and restore the original labels
+data(datA)
+
+converted <- fact_to_num(datA)
+
+color_restored <- num_to_fact(
+  x = converted$data$color,
+  table = converted$tables$color
+)
+
+color_restored
+levels(color_restored)
+}

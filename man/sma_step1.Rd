@@ -4,46 +4,34 @@
 \alias{sma_step1}
 \title{SMA step 1: selection of best imputed dataset}
 \usage{
-sma_step1(datA, datB, datC, output_ll)
+sma_step1(datABC, output_ll)
 }
 \arguments{
-\item{datA}{data.frame A}
-
-\item{datB}{data.frame B}
-
-\item{datC}{data.frame C}
+\item{datABC}{data.frame of class datABC_SM returned by \code{datABC_to_SM}}
 
 \item{output_ll}{list with imputed datasets (impdata)}
 }
 \value{
 A list with imputed datasets:
 \describe{
-\item{datABC_imp1}{The full imputed dataset combining A, B, and C.}
-\item{datA_imp1}{Subset of the imputed data corresponding to dataset A.}
-\item{datB_imp1}{Subset corresponding to dataset B.}
-\item{datC_imp1}{Subset corresponding to dataset C.}
+\item{datABC_imp}{The full imputed dataset combining A, B, and C.}
+\item{datA_imp}{Subset of the imputed data corresponding to dataset A.}
+\item{datB_imp}{Subset corresponding to dataset B.}
 }
 }
 \description{
 Selects the imputed dataset minimizing the Hellinger distance
-between the reference distribution from dataset A and the
-synthetic distribution from dataset B, in a three-sample
+between the reference distribution of Z from dataset B and the
+synthetic distribution of Z from dataset A, in a three-sample
 statistical matching framework (A, B, C).
 }
 \examples{
 if (requireNamespace("NPBayesImputeCat", quietly = TRUE)) {
   data(datA)
   data(datB)
+  data(datC)
 
-  datAB <- datAB_to_SM(datA, datB)
-  datC <- data.frame(
-    X = datB$X[1:4],
-    Y1 = datA$Y1[1:4],
-    Z1 = datB$Z1[1:4]
-  )
-
-  # adding auxiliary information
-  datABC <- rbind(datAB, datC)
+  datABC <- datABC_to_SM(datA, datB, datC, "color", "targetB")
 
   # call DPMPM
   output_list_AII <- NPBayesImputeCat::DPMPM_nozeros_imp(
@@ -52,7 +40,7 @@ if (requireNamespace("NPBayesImputeCat", quietly = TRUE)) {
     m = 2, seed = 1234, silent = FALSE
   )
 
-  step_first_aii <- sma_step1(datA, datB, datC, output_list_AII)
+  step_first_aii <- sma_step1(datABC, output_list_AII)
   names(step_first_aii)
 }
 }

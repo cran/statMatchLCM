@@ -57,6 +57,19 @@ fact_to_num <- function(df) {
 #'   \item{labels}{Defined by \code{table$level_fact}.}
 #' }
 #' @export
+#' @examples
+#' # Convert factors to numeric codes and restore the original labels
+#' data(datA)
+#'
+#' converted <- fact_to_num(datA)
+#'
+#' color_restored <- num_to_fact(
+#'   x = converted$data$color,
+#'   table = converted$tables$color
+#' )
+#'
+#' color_restored
+#' levels(color_restored)
 num_to_fact <- function(x, table) {
   factor(x, levels = table$level_num, labels = table$level_fact)
 }
@@ -72,18 +85,144 @@ num_to_fact <- function(x, table) {
 #'
 #' @param datA data.frame A
 #' @param datB data.frame B
-#' @return data.frame with harmonized structure
+#' @param Y the target variable in datA
+#' @param Z the target variable in datB
+#' @return data.frame of class() "datAB_SM" with harmonized structure
 #' @export
 #' @examples
 #' data(datA)
 #' data(datB)
-#' datAB_to_SM(datA, datB)
-datAB_to_SM <- function(datA, datB){
-  datA_full <- data.frame(datA, Z1 = NA)
-  datB_full <- data.frame(datB, Y1 = NA)
+#' datAB_to_SM(datA, datB, color, targetB)
+datAB_to_SM <- function(datA, datB, Y, Z) {
+
+  Y_expr <- substitute(Y)
+  Z_expr <- substitute(Z)
+
+  Y <- if (is.character(Y_expr)) {
+    as.character(Y_expr)
+  } else if (is.name(Y_expr)) {
+    as.character(Y_expr)
+  } else {
+    stop("`Y` must be supplied as a column name, e.g. `color` or \"color\".")
+  }
+
+  Z <- if (is.character(Z_expr)) {
+    as.character(Z_expr)
+  } else if (is.name(Z_expr)) {
+    as.character(Z_expr)
+  } else {
+    stop("`Z` must be supplied as a column name, e.g. `targetB` or \"targetB\".")
+  }
+
+  if (!is.data.frame(datA) || !is.data.frame(datB)) {
+    stop("`datA` and `datB` must be data frames.")
+  }
+
+  if (!Y %in% names(datA)) {
+    stop("`Y` must be the name of a variable in `datA`.")
+  }
+
+  if (!Z %in% names(datB)) {
+    stop("`Z` must be the name of a variable in `datB`.")
+  }
+
+  datA_full <- datA
+  datA_full[[Z]] <- NA
+  datA_full$source <- "datA"
+
+  datB_full <- datB
+  datB_full[[Y]] <- NA
+  datB_full$source <- "datB"
+
   datAB <- rbind(datA_full, datB_full)
-  datAB <- data.frame(lapply(datAB, function(x) factor(x)))
-  return(datAB)
+  datAB <- data.frame(lapply(datAB, factor))
+
+  attr(datAB, "Y") <- Y
+  attr(datAB, "Z") <- Z
+
+  class(datAB) <- c("datAB_SM", "data.frame")
+  datAB
+}
+
+#' Create stacked A/B/C dataset for MDA
+#'
+#' Creates a joint data set with missing Y1/Z1,
+#' required for mass data combination.
+#'
+#' @param datA data.frame A
+#' @param datB data.frame B
+#' @param datC data.frame C
+#' @param Y the target variable in datA
+#' @param Z the target variable in datB
+#' @return data.frame of class() "datABC_SM" with harmonized structure
+#' @export
+#' @examples
+#' data(datA)
+#' data(datB)
+#' data(datC)
+#' datABC_to_SM(datA, datB, datC, color, targetB)
+datABC_to_SM <- function(datA, datB, datC, Y, Z) {
+
+  Y_expr <- substitute(Y)
+  Z_expr <- substitute(Z)
+
+  Y <- if (is.character(Y_expr)) {
+    as.character(Y_expr)
+  } else if (is.name(Y_expr)) {
+    as.character(Y_expr)
+  } else {
+    stop("`Y` must be supplied as a column name, e.g. `color` or \"color\".")
+  }
+
+  Z <- if (is.character(Z_expr)) {
+    as.character(Z_expr)
+  } else if (is.name(Z_expr)) {
+    as.character(Z_expr)
+  } else {
+    stop("`Z` must be supplied as a column name, e.g. `targetB` or \"targetB\".")
+  }
+
+  if (!is.data.frame(datA) ||
+      !is.data.frame(datB) ||
+      !is.data.frame(datC)) {
+    stop("`datA`, `datB`, and `datC` must be data frames.")
+  }
+
+  if (Y == Z) {
+    stop("`Y` and `Z` must refer to different variables.")
+  }
+
+  if (!Y %in% names(datA)) {
+    stop("`Y` must be the name of a variable in `datA`.")
+  }
+
+  if (!Z %in% names(datB)) {
+    stop("`Z` must be the name of a variable in `datB`.")
+  }
+
+  if (!all(c(Y, Z) %in% names(datC))) {
+    stop("`datC` must contain both target variables.")
+  }
+
+  datA_full <- datA
+  datA_full[[Z]] <- NA
+  datA_full$source <- "datA"
+
+  datB_full <- datB
+  datB_full[[Y]] <- NA
+  datB_full$source <- "datB"
+
+  datC_full <- datC
+  datC_full$source <- "datC"
+
+  datABC <- rbind(datA_full, datB_full, datC_full)
+  datABC <- data.frame(lapply(datABC, factor))
+
+  attr(datABC, "Y") <- Y
+  attr(datABC, "Z") <- Z
+
+  class(datABC) <- c("datABC_SM", "data.frame")
+  datABC
 }
 
 # ============================================================
@@ -98,14 +237,13 @@ datAB_to_SM <- function(datA, datB){
 #' improving the statistical consistency of the imputation.
 #'
 #'
-#' @param datA data.frame A
-#' @param datB data.frame B
+#' @param datAB data.frame of the class datAB_SM return by the function \code{datAB_to_SM}
 #' @param output_ll list with imputed datasets (impdata)
 #' @return A list with imputed datasets:
 #' \describe{
-#'   \item{datAB_imp1}{The full imputed dataset obtained after combining A and B.}
-#'   \item{datA_imp1}{Subset of \code{datAB_imp1} corresponding to dataset A.}
-#'   \item{datB_imp1}{Subset of \code{datAB_imp1} corresponding to dataset B.}
+#'   \item{datAB_imp}{The full imputed dataset obtained after combining A and B.}
+#'   \item{datA_imp}{Subset of \code{datAB_imp} corresponding to dataset A.}
+#'   \item{datB_imp}{Subset of \code{datAB_imp} corresponding to dataset B.}
 #' }
 #' @export
 #' @references
@@ -134,7 +272,7 @@ datAB_to_SM <- function(datA, datB){
 #'   data(datA)
 #'   data(datB)
 #'
-#'   datAB <- datAB_to_SM(datA, datB)
+#'   datAB <- datAB_to_SM(datA, datB, "color", "targetB")
 #'
 #'   # call DPMPM (reduced settings for speed)
 #'   output_list <- NPBayesImputeCat::DPMPM_nozeros_imp(
@@ -150,41 +288,54 @@ datAB_to_SM <- function(datA, datB){
 #'     silent = TRUE
 #'   )
 #'
-#'   step_first <- smc_step1(datA, datB, output_list)
-#'   str(step_first$datA_imp1)
-#'   str(step_first$datB_imp1)
+#'   step_first <- smc_step1(datAB, output_list)
+#'   str(step_first$datA_imp)
+#'   str(step_first$datB_imp)
 #' }
-smc_step1 <- function(datA, datB, output_ll){
-  splitA <- nrow(datA)
-  splitB <- nrow(datA) + 1
-  nrowAB <- nrow(datA) + nrow(datB)
-  datAB_impll <- output_ll$impdata
+smc_step1 <- function(datAB, output_ll){
+  if (!inherits(datAB, "datAB_SM")) {
+    stop("`datAB` must be an object of class `datAB_SM`.", call. = FALSE)
+  }
 
-  list1 <- lapply(datAB_impll, function(x) {
-    datA_imp <- x[1:splitA, ]
-    datB_imp <- x[splitB:nrowAB, ]
-    tt0  <- table(datA_imp[, ncol(x)])
-    tts1 <- table(datB_imp[, ncol(x)])
-    Hell_meas <- comp.prop(
-      p1 = tts1, p2 = tt0, n1 = nrow(datA),
-      n2 = NULL, ref = TRUE
-    )$meas
-    list(Hell_meas = Hell_meas,
-         datA_imp = datA_imp,
-         datB_imp = datB_imp)
+  Y <- attr(datAB, "Y", exact = TRUE)
+  Z <- attr(datAB, "Z", exact = TRUE)
+
+  if (is.null(Y) || is.null(Z)) {
+    stop("`datAB` must contain the `Y` and `Z` attributes.", call. = FALSE)
+  }
+
+  add_target_attributes <- function(x, Y, Z) {
+    attr(x, "Y") <- Y
+    attr(x, "Z") <- Z
+    x
+  }
+
+  datAB_imp_ll <- lapply(
+    output_ll$impdata,
+    add_target_attributes,
+    Y = Y,
+    Z = Z
+  )
+
+  list1 <- lapply(datAB_imp_ll, function(x) {
+    datA_imp <- x[x$source == "datA", , drop = FALSE]
+    datB <- x[x$source == "datB", , drop = FALSE]
+    prob_observed <- table(datB[[Z]])
+    prob_synthetic <- table(factor(datA_imp[[Z]], levels = levels(datB[[Z]])))
+    Hell_meas <- comp.prop(p1 = prob_synthetic, p2 = prob_observed, n1 = nrow(datA_imp), n2 = NULL, ref = TRUE)$meas
+    list(Hell_meas = Hell_meas, datA_imp = datA_imp)
   })
 
   df1 <- data.frame(do.call(rbind, lapply(list1, `[[`, "Hell_meas")))
   minHell <- which.min(df1$Hell)
+  datAB_imp <- datAB_imp_ll[[minHell]]
+  rownames(datAB_imp) <- NULL
 
-  datAB_imp1 <- output_ll$impdata[[minHell]]
-  rownames(datAB_imp1) <- NULL
-
-  list(
-    datAB_imp1 = datAB_imp1,
-    datA_imp1  = datAB_imp1[1:splitA, ],
-    datB_imp1  = datAB_imp1[splitB:nrowAB, ]
-  )
+  out <- list(datAB_imp = datAB_imp, datA_imp = datAB_imp[datAB_imp$source == "datA", , drop = FALSE], datB_imp = datAB_imp[datAB_imp$source == "datB", , drop = FALSE])
+  attr(out, "Y") <- Y
+  attr(out, "Z") <- Z
+  class(out) <- c("step1_SMC", "list")
+  return(out)
 }
 
 # ============================================================
@@ -203,6 +354,7 @@ smc_step1 <- function(datA, datB, output_ll){
 #' \describe{
 #'   \item{datA_fused_2}{The final fused dataset A after step 2 of the procedure.}
 #'   \item{out_nndd}{A list containing nearest-neighbour distance matching results.}
+#'   \item{match_vars}{Matching variables in the nearest-neighbour distance matching procedure.}
 #' }
 #' @export
 #' @references
@@ -231,7 +383,7 @@ smc_step1 <- function(datA, datB, output_ll){
 #'   data(datA)
 #'   data(datB)
 #'
-#'   datAB <- datAB_to_SM(datA, datB)
+#'   datAB <- datAB_to_SM(datA, datB, "color", "targetB")
 #'
 #'   # call DPMPM (reduced settings for speed)
 #'   output_list <- NPBayesImputeCat::DPMPM_nozeros_imp(
@@ -247,32 +399,41 @@ smc_step1 <- function(datA, datB, output_ll){
 #'     silent = TRUE
 #'   )
 #'
-#'   step_first <- smc_step1(datA, datB, output_list)
+#'   step_first <- smc_step1(datAB, output_list)
+#'   set.seed(1234)
 #'   step_second <- smc1_step2(step_first)
 #'
 #'   result <- step_second$datA_fused_2
 #'   result
 #' }
 smc1_step2 <- function(step1){
-  datA_imp1 <- step1$datA_imp1
-  datB_imp1 <- step1$datB_imp1
+  if (!inherits(step1, "step1_SMC")) {
+    stop("`step1` must be an object of class `step1_SMC`.", call. = FALSE)
+  }
+  datA_imp <- step1$datA_imp
+  datB_imp <- step1$datB_imp
+  Y <- attr(datB_imp, "Y", exact = TRUE)
+  Z <- attr(datB_imp, "Z", exact = TRUE)
+  datA_imp$source <- NULL; datB_imp$source <- NULL
 
-  datA_imp1_num <- fact_to_num(datA_imp1)$data
-  datB_imp1_num <- fact_to_num(datB_imp1)$data
-
-  X_mtcc_datA <- names(datA_imp1)[-ncol(datA_imp1)]
-
+  match.vars = setdiff(names(datA_imp), Z)
   out_nndd <- NND.hotdeck(
-    data.rec = datA_imp1_num,
-    data.don = datB_imp1_num,
-    match.vars = X_mtcc_datA
+    data.rec = datA_imp,
+    data.don = datB_imp,
+    dist.fun="Gower",
+    match.vars = match.vars
   )
 
   idxA <- out_nndd$mtc.ids[, 2]
-  Z1_map <- setNames(datB_imp1$Z1, rownames(datB_imp1))
-  datA_imp1$Z1 <- factor(Z1_map[idxA], levels = levels(datB_imp1$Z1))
+  Z_map <- setNames(datB_imp[[Z]], rownames(datB_imp))
+  datA_imp[[Z]] <- factor(Z_map[idxA], levels = levels(datB_imp[[Z]]))
 
-  list(datA_fused_2 = datA_imp1, out_nndd = out_nndd)
+  out <- list(datA_fused_2 = datA_imp, out_nndd = out_nndd, match_vars = match.vars)
+  attr(out, "Y") <- Y
+  attr(out, "Z") <- Z
+
+  class(out) <- c("step2_SMC", "list")
+  out
 }
 
 #' SMC2 – Hot deck on fitted multinomial probabilities
@@ -286,9 +447,10 @@ smc1_step2 <- function(step1){
 #' \describe{
 #'   \item{datA_fused_2}{A data frame containing the final fused (imputed) version of dataset A.}
 #'   \item{out_nndd}{A list with results from the nearest-neighbour distance matching procedure.}
+#'   \item{match_vars}{Matching variables in the nearest-neighbour distance matching procedure.}
 #'   \item{model_form}{A formula object used to fit the models.}
-#'   \item{FitteddatA_imp1}{A data frame of fitted values obtained from the model for dataset A.}
-#'   \item{FitteddatB_imp1}{A data frame of fitted values obtained from the model for dataset B.}
+#'   \item{fitA}{A data frame of fitted values obtained from the model for dataset A.}
+#'   \item{fitB}{A data frame of fitted values obtained from the model for dataset B.}
 #' }
 #' @export
 #' @references
@@ -317,7 +479,7 @@ smc1_step2 <- function(step1){
 #'   data(datA)
 #'   data(datB)
 #'
-#'   datAB <- datAB_to_SM(datA, datB)
+#'   datAB <- datAB_to_SM(datA, datB, "color", "targetB")
 #'
 #'   # call DPMPM (reduced settings for speed)
 #'   output_list <- NPBayesImputeCat::DPMPM_nozeros_imp(
@@ -333,45 +495,68 @@ smc1_step2 <- function(step1){
 #'     silent = TRUE
 #'   )
 #'
-#'   step_first <- smc_step1(datA, datB, output_list)
+#'   step_first <- smc_step1(datAB, output_list)
+#'   set.seed(1234)
 #'   step_second <- smc2_step2(step_first)
 #'
 #'   result <- step_second$datA_fused_2
 #'   result
 #' }
 smc2_step2 <- function(step1){
-  datA_imp1 <- step1$datA_imp1
-  datB_imp1 <- step1$datB_imp1
+  if (!inherits(step1, "step1_SMC")) {
+    stop("`step1` must be an object of class `step1_SMC`.", call. = FALSE)
+  }
 
-  datA_imp1_num <- fact_to_num(datA_imp1)$data
-  datB_imp1_num <- fact_to_num(datB_imp1)$data
+  datA_imp <- step1$datA_imp
+  datB_imp <- step1$datB_imp
+  Y <- attr(datA_imp, "Y", exact = TRUE)
+  Z <- attr(datB_imp, "Z", exact = TRUE)
 
-  predictors <- setdiff(names(datA_imp1_num), "Z1")
-  formula_nnet <- as.formula(paste("Z1 ~", paste(predictors, collapse = " + ")))
+  datA_imp$source <- NULL; datB_imp$source <- NULL
 
-  modA <- multinom(formula_nnet, data = datA_imp1_num)
-  modB <- multinom(formula_nnet, data = datB_imp1_num)
+  predictors <- setdiff(names(datA_imp), Z)
+  formula_nnet <- as.formula(paste(Z, "~", paste(predictors, collapse = " + ")))
+  modA <- multinom(formula_nnet, data = datA_imp, trace = FALSE)
+  modB <- multinom(formula_nnet, data = datB_imp, trace = FALSE)
 
-  fitA <- as.data.frame(fitted(modA))
-  fitB <- as.data.frame(fitted(modB))
+  fitted_colnames <- function(mod) {
+    levs <- mod$lev
+    fit <- as.data.frame(fitted(mod))
+    if (length(levs) == 2L) {
+      p2 <- fit[[1L]]
+      fit <- data.frame(1 - p2, p2, check.names = FALSE, row.names = row.names(fit))
+    }
+    names(fit) <- levs
+    fit
+  }
+  fitA <- fitted_colnames(modA)
+  fitB <- fitted_colnames(modB)
 
+  match.vars = colnames(fitA)
   out_nndd <- NND.hotdeck(
-    data.rec = cbind(datA_imp1_num, fitA),
-    data.don = cbind(datB_imp1_num, fitB),
-    match.vars = colnames(fitA)
+    data.rec = cbind(datA_imp, fitA),
+    data.don = cbind(datB_imp, fitB),
+    dist.fun = "Gower",
+    match.vars = match.vars
   )
 
   idxA <- out_nndd$mtc.ids[, 2]
-  Z1_map <- setNames(datB_imp1$Z1, rownames(datB_imp1))
-  datA_imp1$Z1 <- factor(Z1_map[idxA], levels = levels(datB_imp1$Z1))
+  Z_map <- setNames(datB_imp[[Z]], rownames(datB_imp))
+  datA_imp[[Z]] <- factor(Z_map[idxA], levels = levels(datB_imp[[Z]]))
 
-  list(
-    datA_fused_2 = datA_imp1,
+  out <- list(
+    datA_fused_2 = datA_imp,
     out_nndd = out_nndd,
+    match_vars = match.vars,
     model_form = formula_nnet,
-    FitteddatA_imp1 = fitA,
-    FitteddatB_imp1 = fitB
-  )
+    fitA = fitA,
+    fitB = fitB
+   )
+  attr(out, "Y") <- Y
+  attr(out, "Z") <- Z
+
+  class(out) <- c("step2_SMC", "list")
+  out
 }
 
 #' SMC3 – Multinomial simulation approach
@@ -383,7 +568,9 @@ smc2_step2 <- function(step1){
 #' @return A list with:
 #' \describe{
 #'   \item{datA_fused_2}{A data frame containing the final fused (imputed) version of dataset A.}
-#'   \item{FitteddatA_imp1}{A data frame of fitted values obtained from the model for dataset A.}
+#'   \item{fitA}{A data frame of fitted values obtained from the model for dataset A.}
+#'   \item{model_form}{A formula object used to fit the models.}
+#'   \item{modA}{A multinomial regression model on datA_imp.}
 #' }
 #' @export
 #' @references
@@ -412,7 +599,7 @@ smc2_step2 <- function(step1){
 #'   data(datA)
 #'   data(datB)
 #'
-#'   datAB <- datAB_to_SM(datA, datB)
+#'   datAB <- datAB_to_SM(datA, datB, "color", "targetB")
 #'
 #'   # call DPMPM (reduced settings for speed)
 #'   output_list <- NPBayesImputeCat::DPMPM_nozeros_imp(
@@ -428,32 +615,51 @@ smc2_step2 <- function(step1){
 #'     silent = TRUE
 #'   )
 #'
-#'   step_first <- smc_step1(datA, datB, output_list)
+#'   step_first <- smc_step1(datAB, output_list)
+#'   set.seed(1234)
 #'   step_second <- smc3_step2(step_first)
 #'
 #'   result <- step_second$datA_fused_2
 #'   result
 #' }
 smc3_step2 <- function(step1){
-  datA_imp1 <- step1$datA_imp1
+  if (!inherits(step1, "step1_SMC")) {
+    stop("`step1` must be an object of class `step1_SMC`.", call. = FALSE)
+  }
 
-  datA_to_num <- fact_to_num(datA_imp1)
-  datA_imp1_num <- datA_to_num$data
+  datA_imp <- step1$datA_imp
+  datA_imp$source <- NULL
+  Y <- attr(datA_imp, "Y", exact = TRUE)
+  Z <- attr(datA_imp, "Z", exact = TRUE)
 
-  predictors <- setdiff(names(datA_imp1_num), "Z1")
-  formula_nnet <- as.formula(paste("Z1 ~", paste(predictors, collapse = " + ")))
+  predictors <- setdiff(names(datA_imp), Z)
+  formula_nnet <- as.formula(paste(Z, "~", paste(predictors, collapse = " + ")))
+  modA <- multinom(formula_nnet, data = datA_imp, trace = FALSE)
 
-  modA <- multinom(formula_nnet, data = datA_imp1_num)
-  fitA <- as.data.frame(fitted(modA))
+  fitted_colnames <- function(mod) {
+    levs <- mod$lev
+    fit <- as.data.frame(fitted(mod))
+    if (length(levs) == 2L) {
+      p2 <- fit[[1L]]
+      fit <- data.frame(1 - p2, p2, check.names = FALSE, row.names = row.names(fit))
+    }
+    names(fit) <- levs
+    fit
+  }
+  fitA <- fitted_colnames(modA)
+  Z_new <- vapply(seq_len(nrow(fitA)), function(i) {
+    indeks <- which(rmultinom(1, 1, prob = fitA[i, ]) == 1)
+    names(fitA)[indeks]
+  }, character(1)) |> as.factor()
 
-  p <- ncol(fitA)
-  Z1_new <- sapply(seq_len(nrow(fitA)), function(i)
-    which(rmultinom(1, 1, fitA[i, 1:p]) == 1)
-  )
+  datA_imp[[Z]] <- Z_new
 
-  datA_imp1$Z1 <- num_to_fact(Z1_new, datA_to_num$tables$Z1)
+  out <- list(datA_fused_2 = datA_imp, fitA = fitA, model_form = formula_nnet, modA = modA)
+  attr(out, "Y") <- Y
+  attr(out, "Z") <- Z
 
-  list(datA_fused_2 = datA_imp1, FitteddatA_imp1 = fitA)
+  class(out) <- c("step2_SMC", "list")
+  out
 }
 
 
@@ -464,21 +670,18 @@ smc3_step2 <- function(step1){
 #' SMA step 1: selection of best imputed dataset
 #'
 #' Selects the imputed dataset minimizing the Hellinger distance
-#' between the reference distribution from dataset A and the
-#' synthetic distribution from dataset B, in a three-sample
+#' between the reference distribution of Z from dataset B and the
+#' synthetic distribution of Z from dataset A, in a three-sample
 #' statistical matching framework (A, B, C).
 #'
-#' @param datA data.frame A
-#' @param datB data.frame B
-#' @param datC data.frame C
+#' @param datABC data.frame of class datABC_SM returned by \code{datABC_to_SM}
 #' @param output_ll list with imputed datasets (impdata)
 #' @return A list with imputed datasets:
 #' \describe{
-#'   \item{datABC_imp1}{The full imputed dataset combining A, B, and C.}
-#'   \item{datA_imp1}{Subset of the imputed data corresponding to dataset A.}
-#'   \item{datB_imp1}{Subset corresponding to dataset B.}
-#'   \item{datC_imp1}{Subset corresponding to dataset C.}
-#' }
+#'   \item{datABC_imp}{The full imputed dataset combining A, B, and C.}
+#'   \item{datA_imp}{Subset of the imputed data corresponding to dataset A.}
+#'   \item{datB_imp}{Subset corresponding to dataset B.}
+#'  }
 #'
 #' @importFrom StatMatch comp.prop
 #' @export
@@ -507,16 +710,9 @@ smc3_step2 <- function(step1){
 #' if (requireNamespace("NPBayesImputeCat", quietly = TRUE)) {
 #'   data(datA)
 #'   data(datB)
+#'   data(datC)
 #'
-#'   datAB <- datAB_to_SM(datA, datB)
-#'   datC <- data.frame(
-#'     X = datB$X[1:4],
-#'     Y1 = datA$Y1[1:4],
-#'     Z1 = datB$Z1[1:4]
-#'   )
-#'
-#'   # adding auxiliary information
-#'   datABC <- rbind(datAB, datC)
+#'   datABC <- datABC_to_SM(datA, datB, datC, "color", "targetB")
 #'
 #'   # call DPMPM
 #'   output_list_AII <- NPBayesImputeCat::DPMPM_nozeros_imp(
@@ -525,51 +721,86 @@ smc3_step2 <- function(step1){
 #'     m = 2, seed = 1234, silent = FALSE
 #'   )
 #'
-#'   step_first_aii <- sma_step1(datA, datB, datC, output_list_AII)
+#'   step_first_aii <- sma_step1(datABC, output_list_AII)
 #'   names(step_first_aii)
 #' }
-sma_step1 <- function(datA, datB, datC, output_ll){
-  splitA <- nrow(datA)
-  splitB <- nrow(datA) + 1
-  nrowAB <- nrow(datA) + nrow(datB)
-  splitC <- nrowAB + 1
-  nrowABC <- nrowAB + nrow(datC)
+sma_step1 <- function(datABC, output_ll) {
 
-  datABC_impll <- output_ll$impdata
+  if (!inherits(datABC, "datABC_SM")) {
+    stop("`datABC` must be an object of class `datABC_SM`.",
+         call. = FALSE)
+  }
 
-  list1 <- lapply(datABC_impll, function(x) {
+  Y <- attr(datABC, "Y", exact = TRUE)
+  Z <- attr(datABC, "Z", exact = TRUE)
 
-    datA_imp <- x[1:splitA, ]
-    datB_imp <- x[splitB:nrowAB, ]
+  if (!all(c(Y, Z, "source") %in% names(datABC))) {
+    stop("Variables specified by `Y`, `Z`, and `source` must occur in `datABC`.",
+         call. = FALSE)
+  }
 
-    tt0  <- table(datA_imp[, ncol(x)])   # reference distribution
-    tts1 <- table(datB_imp[, ncol(x)])   # synthetic distribution
+  if (is.null(Y) || is.null(Z)) {
+    stop("`datABC` must contain the `Y` and `Z` attributes.",
+         call. = FALSE)
+  }
+
+  add_target_attributes <- function(x, Y, Z) {
+    attr(x, "Y") <- Y
+    attr(x, "Z") <- Z
+    x
+  }
+
+  datABC_imp_ll <- lapply(
+    output_ll$impdata,
+    add_target_attributes,
+    Y = Y,
+    Z = Z
+  )
+
+  list1 <- lapply(datABC_imp_ll, function(x) {
+    datA_imp <- x[x$source == "datA", , drop = FALSE]
+    datB <- x[x$source == "datB", , drop = FALSE]
+
+    prob_observed <- table(datB[[Z]])
+    prob_synthetic <- table(
+      factor(datA_imp[[Z]], levels = levels(datB[[Z]]))
+    )
 
     Hell_meas <- comp.prop(
-      p1 = tts1,
-      p2 = tt0,
-      n1 = nrow(datA),
+      p1 = prob_synthetic,
+      p2 = prob_observed,
+      n1 = nrow(datA_imp),
       n2 = NULL,
       ref = TRUE
     )$meas
 
-    list(Hell_meas = Hell_meas)
+    list(
+      Hell_meas = Hell_meas,
+      datA_imp = datA_imp
+      )
   })
 
-  df1 <- data.frame(do.call(rbind, lapply(list1, `[[`, "Hell_meas")))
+  df1 <- data.frame(
+    do.call(rbind, lapply(list1, `[[`, "Hell_meas"))
+  )
+
   minHell <- which.min(df1$Hell)
 
-  datABC_imp1 <- datABC_impll[[minHell]]
-  rownames(datABC_imp1) <- NULL
+  datABC_imp <- datABC_imp_ll[[minHell]]
+  rownames(datABC_imp) <- NULL
 
-  list(
-    datABC_imp1 = datABC_imp1,
-    datA_imp1   = datABC_imp1[1:splitA, ],
-    datB_imp1   = datABC_imp1[splitB:nrowAB, ],
-    datC_imp1   = datABC_imp1[splitC:nrowABC, ]
-  )
+  out <- list(
+    datABC_imp = datABC_imp,
+    datA_imp = datABC_imp[datABC_imp$source == "datA", , drop = FALSE],
+    datB_imp = datABC_imp[datABC_imp$source == "datB", , drop = FALSE]
+    )
+
+  attr(out, "Y") <- Y
+  attr(out, "Z") <- Z
+
+  class(out) <- c("step1_SMA", "list")
+  out
 }
-
 
 #' SMA1 – Nearest-neighbour hot deck on shared variables
 #'
@@ -581,6 +812,7 @@ sma_step1 <- function(datA, datB, datC, output_ll){
 #' \describe{
 #'   \item{datA_fused_2}{The final fused dataset A.}
 #'   \item{out_nndd}{NNDD matching results.}
+#'   \item{match.vars}{Matching variables in the nearest-neighbour distance matching procedure.}
 #' }
 #' @importFrom StatMatch NND.hotdeck
 #' @export
@@ -610,15 +842,9 @@ sma_step1 <- function(datA, datB, datC, output_ll){
 #'   data(datA)
 #'   data(datB)
 #'
-#'   datAB <- datAB_to_SM(datA, datB)
-#'   datC <- data.frame(
-#'     X = datB$X[1:4],
-#'     Y1 = datA$Y1[1:4],
-#'     Z1 = datB$Z1[1:4]
-#'   )
+#'   data(datC)
 #'
-#'   # adding auxiliary information
-#'   datABC <- rbind(datAB, datC)
+#'   datABC <- datABC_to_SM(datA, datB, datC, "color", "targetB")
 #'
 #'   # call DPMPM (reduced settings for speed)
 #'   output_list_AII <- NPBayesImputeCat::DPMPM_nozeros_imp(
@@ -634,32 +860,42 @@ sma_step1 <- function(datA, datB, datC, output_ll){
 #'     silent = TRUE
 #'   )
 #'
-#'   step_first_aii <- sma_step1(datA, datB, datC, output_list_AII)
+#'   step_first_aii <- sma_step1(datABC, output_list_AII)
+#'   set.seed(1234)
 #'   step_second_aii1 <- sma1_step2(step_first_aii)
 #'
 #'   result_aii1 <- step_second_aii1$datA_fused_2
 #'   head(result_aii1)
 #' }
 sma1_step2 <- function(step1){
-  datA_imp1 <- step1$datA_imp1
-  datC_imp1 <- step1$datC_imp1
+  if (!inherits(step1, "step1_SMA")) {
+    stop("`step1` must be an object of class `step1_SMA`.", call. = FALSE)
+  }
 
-  datA_imp1_num <- fact_to_num(datA_imp1)$data
-  datC_imp1_num <- fact_to_num(datC_imp1)$data
+  datA_imp <- step1$datA_imp
+  Y <- attr(datA_imp, "Y", exact = TRUE)
+  Z <- attr(datA_imp, "Z", exact = TRUE)
+  datC <- step1$datABC_imp[step1$datABC_imp$source == "datC", , drop = FALSE]
 
-  X_mtcc_datA <- c("Y1", "Z1")
-
+  datA_imp$source <- NULL
+  match.vars = c(Y, Z)
   out_nndd <- NND.hotdeck(
-    data.rec  = datA_imp1_num,
-    data.don  = datC_imp1_num,
-    match.vars = X_mtcc_datA
+    data.rec  = datA_imp,
+    data.don  = datC,
+    dist.fun = "Gower",
+    match.vars = match.vars
   )
 
   idxA <- out_nndd$mtc.ids[, 2]
-  Z1_map <- setNames(datC_imp1$Z1, rownames(datC_imp1))
-  datA_imp1$Z1 <- factor(Z1_map[idxA], levels = levels(datC_imp1$Z1))
+  Z_map <- setNames(datC[[Z]], rownames(datC))
+  datA_imp[[Z]] <- factor(Z_map[idxA], levels = levels(datA_imp[[Z]]))
 
-  list(datA_fused_2 = datA_imp1, out_nndd = out_nndd)
+  out <- list(datA_fused_2 = datA_imp, out_nndd = out_nndd, match.vars = match.vars)
+  attr(out, "Y") <- Y
+  attr(out, "Z") <- Z
+
+  class(out) <- c("step2_SMA", "list")
+  out
 }
 
 #' SMA2 – Hot deck on fitted multinomial probabilities
@@ -672,9 +908,9 @@ sma1_step2 <- function(step1){
 #' \describe{
 #'   \item{datA_fused_2}{A data frame containing the final fused (imputed) version of dataset A.}
 #'   \item{out_nnd}{A list with results from the nearest-neighbour distance matching procedure.}
-#'   \item{model_form}{A formula object specifying the model used.}
-#'   \item{FitteddatA_imp1}{A data frame of fitted values obtained for dataset A.}
-#'   \item{FitteddatC_imp1}{A data frame of fitted values obtained for dataset C.}
+#'   \item{match_vars}{Matching variables in the nearest-neighbour distance matching procedure.}
+#'   \item{modA}{A multinomial logistic model obtained for dataset datA_imp.}
+#'   \item{modC}{A multinomial logistic model obtained for dataset datC.}
 #' }
 #' @importFrom StatMatch NND.hotdeck
 #' @importFrom nnet multinom
@@ -704,18 +940,11 @@ sma1_step2 <- function(step1){
 #' if (requireNamespace("NPBayesImputeCat", quietly = TRUE)) {
 #'   data(datA)
 #'   data(datB)
+#'   data(datC)
 #'
-#'   datAB <- datAB_to_SM(datA, datB)
-#'   datC <- data.frame(
-#'     X = datB$X[1:4],
-#'     Y1 = datA$Y1[1:4],
-#'     Z1 = datB$Z1[1:4]
-#'   )
+#'   datABC <- datABC_to_SM(datA, datB, datC, "color", "targetB")
 #'
-#'   # adding auxiliary information
-#'   datABC <- rbind(datAB, datC)
-#'
-#'   output_list_AII <- NPBayesImputeCat::DPMPM_nozeros_imp(
+#'     output_list_AII <- NPBayesImputeCat::DPMPM_nozeros_imp(
 #'     X = datABC,
 #'     nrun = 50,
 #'     burn = 10,
@@ -728,46 +957,76 @@ sma1_step2 <- function(step1){
 #'     silent = TRUE
 #'   )
 #'
-#'   step_first_aii <- sma_step1(datA, datB, datC, output_list_AII)
+#'   step_first_aii <- sma_step1(datABC, output_list_AII)
+#'   set.seed(1234)
 #'   step_second_aii2 <- sma2_step2(step_first_aii)
 #'
 #'   result_aii2 <- step_second_aii2$datA_fused_2
 #'   head(result_aii2)
 #' }
 sma2_step2 <- function(step1){
-  datA_imp1 <- step1$datA_imp1
-  datC_imp1 <- step1$datC_imp1
+  if (!inherits(step1, "step1_SMA")) {
+    stop("`step1` must be an object of class `step1_SMA`.", call. = FALSE)
+  }
 
-  datA_imp1_num <- fact_to_num(datA_imp1)$data
-  datC_imp1_num <- fact_to_num(datC_imp1)$data
+  datA_imp <- step1$datA_imp
+  Y <- attr(datA_imp, "Y", exact = TRUE)
+  Z <- attr(datA_imp, "Z", exact = TRUE)
+  datC <- step1$datABC_imp[step1$datABC_imp$source == "datC", , drop = FALSE]
+  datA_imp$source <- NULL; datC$source <- NULL
 
-  predictors <- setdiff(names(datA_imp1_num), "Z1")
-  formula_nnet <- as.formula(paste("Z1 ~", paste(predictors, collapse = " + ")))
+  predictors <- setdiff(names(datA_imp), Z)
+  formula_nnet <- as.formula(paste(Z, "~", paste(predictors, collapse = " + ")))
 
-  modA <- multinom(formula_nnet, data = datA_imp1_num)
-  modC <- multinom(formula_nnet, data = datC_imp1_num)
+  modA <- multinom(formula_nnet, data = datA_imp, trace = FALSE)
+  modC <- multinom(formula_nnet, data = datC, trace = FALSE)
 
-  fitA <- as.data.frame(fitted(modA))
-  fitC <- as.data.frame(fitted(modC))
+  fitted_colnames <- function(mod) {
+    levs <- mod$lev
+    fit <- as.data.frame(fitted(mod))
 
+    if (length(levs) == 2L) {
+      p2 <- fit[[1L]]
+
+      fit <- data.frame(
+        1 - p2,
+        p2,
+        check.names = FALSE,
+        row.names = row.names(fit)
+      )
+    }
+
+    names(fit) <- levs
+    fit
+  }
+
+  fitA <- fitted_colnames(modA)
+  fitC <- fitted_colnames(modC)
+
+  match.vars = colnames(fitA)
   out_nnd <- NND.hotdeck(
-    data.rec  = cbind(datA_imp1_num, fitA),
-    data.don  = cbind(datC_imp1_num, fitC),
-    match.vars = colnames(fitA),
-    dist.fun = "Gower"
+    data.rec  = cbind(datA_imp, fitA),
+    data.don  = cbind(datC, fitC),
+    dist.fun = "Gower",
+    match.vars = match.vars
   )
 
   idxA <- out_nnd$mtc.ids[, 2]
-  Z1_map <- setNames(datC_imp1$Z1, rownames(datC_imp1))
-  datA_imp1$Z1 <- factor(Z1_map[idxA], levels = levels(datC_imp1$Z1))
+  Z_map <- setNames(datC[[Z]], rownames(datC))
+  datA_imp[[Z]] <- factor(Z_map[idxA], levels = levels(datA_imp[[Z]]))
 
-  list(
-    datA_fused_2 = datA_imp1,
+  out <- list(
+    datA_fused_2 = datA_imp,
     out_nnd = out_nnd,
-    model_form = formula_nnet,
-    FitteddatA_imp1 = fitA,
-    FitteddatC_imp1 = fitC
+    match_vars = match.vars,
+    modA = modA,
+    modC = modC
   )
+  attr(out, "Y") <- Y
+  attr(out, "Z") <- Z
+
+  class(out) <- c("step2_SMA", "list")
+  out
 }
 
 #' SMA3 – Multinomial simulation approach
@@ -779,11 +1038,8 @@ sma2_step2 <- function(step1){
 #' @return A list with:
 #' \describe{
 #'   \item{datA_fused_2}{A data frame containing the final fused version of dataset A.}
-#'   \item{beta_BZ}{A numeric vector of estimated model coefficients.}
-#'   \item{AA_dummy}{A matrix or data frame of dummy variables constructed for dataset A.}
-#'   \item{BB_dummy}{A matrix or data frame of dummy variables constructed for dataset B.}
-#'   \item{prob_Z_all}{A numeric matrix of predicted probabilities for each category of variable Z (rows correspond to observations).}
-#'   \item{zero_one}{A binary matrix (one-hot encoded) sampled from \code{prob_Z_all}, where each row contains a single 1 indicating the selected category of Z.}
+#'   \item{modB}{A multinomial logistic model obtained for dataset datB_imp.}
+#'   \item{zero_one}{A binary matrix (one-hot encoded) sampled from \code{prob_Z_all}, with categories in rows and observations in columns; each column contains a single 1 indicating the selected category of Z.}
 #' }
 #' @importFrom nnet multinom
 #' @export
@@ -812,16 +1068,9 @@ sma2_step2 <- function(step1){
 #' if (requireNamespace("NPBayesImputeCat", quietly = TRUE)) {
 #'   data(datA)
 #'   data(datB)
+#'   data(datC)
 #'
-#'   datAB <- datAB_to_SM(datA, datB)
-#'   datC <- data.frame(
-#'     X = datB$X[1:4],
-#'     Y1 = datA$Y1[1:4],
-#'     Z1 = datB$Z1[1:4]
-#'   )
-#'
-#'   # adding auxiliary information
-#'   datABC <- rbind(datAB, datC)
+#'   datABC <- datABC_to_SM(datA, datB, datC, "color", "targetB")
 #'
 #'   # call DPMPM (reduced settings for speed)
 #'   output_list_AII <- NPBayesImputeCat::DPMPM_nozeros_imp(
@@ -837,43 +1086,45 @@ sma2_step2 <- function(step1){
 #'     silent = TRUE
 #'   )
 #'
-#'   step_first_aii <- sma_step1(datA, datB, datC, output_list_AII)
-#'   step_second_aii3 <- sma1_step2(step_first_aii)
+#'   step_first_aii <- sma_step1(datABC, output_list_AII)
+#'   set.seed(1234)
+#'   step_second_aii3 <- sma3_step2(step_first_aii)
 #'
 #'   result_aii3 <- step_second_aii3$datA_fused_2
 #'   head(result_aii3)
 #' }
 sma3_step2 <- function(step1){
-  datA_imp1 <- step1$datA_imp1
-  datB_imp1 <- step1$datB_imp1
+  datA_imp <- step1$datA_imp
+  datB_imp <- step1$datB_imp
+  datA_imp$source <- NULL; datB_imp$source <- NULL
+  Y <- attr(datB_imp, "Y", exact = TRUE)
+  Z <- attr(datB_imp, "Z", exact = TRUE)
 
-  AB_shared <- intersect(names(datA_imp1), names(datB_imp1))
-  p <- ncol(datA_imp1[AB_shared])
+  predictors <- setdiff(names(datB_imp), Z)
+  formula_nnet <- as.formula(paste(Z, "~", paste(predictors, collapse = " + ")))
+  modB <- multinom(formula_nnet, data = datB_imp, trace = FALSE)
 
-  dummy_ll <- function(dat) {
-    dummy <- lapply(seq_len(p), function(j) {
-      xname <- colnames(dat)[j]
-      levs  <- levels(dat[[j]])
-      used_levs <- if (j == p) levs else levs[-length(levs)]
-      sapply(used_levs, function(lv) as.numeric(dat[[j]] == lv)) |>
-        `colnames<-`(paste(xname, used_levs, sep = "_"))
-    })
-    do.call(cbind, dummy)
+  predict_prob_matrix <- function(mod, newdata) {
+    prob <- predict(mod, newdata = newdata, type = "probs")
+    levs <- mod$lev
+
+    if (length(levs) == 2L) {
+      p2 <- as.numeric(prob)
+      prob <- cbind(1 - p2, p2)
+    } else {
+      prob <- matrix(
+        prob,
+        nrow = nrow(newdata),
+        ncol = length(levs)
+      )
+    }
+
+    colnames(prob) <- levs
+    rownames(prob) <- rownames(newdata)
+    prob
   }
 
-  AA_dummy <- dummy_ll(datA_imp1)
-  BB_dummy <- dummy_ll(datB_imp1)
-
-  modB <- multinom(datB_imp1$Z1 ~ BB_dummy - 1)
-  beta_BZ <- coef(modB)
-  ref_Z1 <- levels(datB_imp1$Z1)[1]
-
-  exp_AA_beta <- exp(AA_dummy %*% t(beta_BZ))
-  prob_ref <- 1 / (1 + rowSums(exp_AA_beta))
-  prob_Z <- exp_AA_beta * prob_ref
-
-  prob_Z_all <- data.frame(prob_ref, prob_Z)
-  colnames(prob_Z_all)[1] <- ref_Z1
+  prob_Z_all <- predict_prob_matrix(modB, datA_imp)
 
   zero_one <- apply(prob_Z_all, 1, function(prob) {
     names(prob) <- colnames(prob_Z_all)
@@ -881,20 +1132,21 @@ sma3_step2 <- function(step1){
   })
 
   rownames(zero_one) <- colnames(prob_Z_all)
-  Z1_new <- apply(zero_one, 2, function(x) rownames(zero_one)[x == 1])
+  Z_new <- apply(zero_one, 2, function(x) rownames(zero_one)[x == 1])
+  Z_new <- factor(Z_new, levels = levels(datB_imp[[Z]]))
+  datA_imp[[Z]] <- Z_new
 
-  datA_fused_2 <- data.frame(datA_imp1[-ncol(datA_imp1)], Z1 = Z1_new)
-
-  list(
-    datA_fused_2 = datA_fused_2,
-    beta_BZ = beta_BZ,
-    AA_dummy = AA_dummy,
-    BB_dummy = BB_dummy,
-    prob_Z_all = prob_Z_all,
+  out <- list(
+    datA_fused_2 = datA_imp,
+    modB = modB,
     zero_one = zero_one
   )
-}
+  attr(out, "Y") <- Y
+  attr(out, "Z") <- Z
 
+  class(out) <- c("step2_SMA", "list")
+  out
+}
 
 # ============================================================
 # Quality assessment
@@ -906,24 +1158,24 @@ sma3_step2 <- function(step1){
 #'  between the reference and synthetic distributions. This measure quantifies the degree of similarity
 #'  between the two distributions, providing an assessment of the accuracy and coherence of the data fusion process
 #'
-#' @param step1 output from \code{smc_step1()}
-#' @param step2 output from step 2 method
+#' @param Z_obs the variable Z_obs from datB
+#' @param Z_fused the variable Z_fused from step2$datA_fused_2
 #' @importFrom StatMatch comp.prop
 #' @return A list with:
 #' \describe{
-#'   \item{heli_latent}{A numeric value representing the Hellinger distance between the reference and synthetic distributions.}
+#'   \item{heli_latent}{The complete list returned by \code{StatMatch::comp.prop()}, containing \code{meas}, \code{chi.sq}, and \code{p.exp}. The Hellinger distance is available as \code{heli_latent$meas["Hell"]}.}
 #'   \item{ref_distr}{A numeric vector or table representing the reference (original) distribution.}
 #'   \item{synt_distr}{A numeric vector or table representing the synthetic (generated) distribution.}
 #' }
 #' @export
-sm_quality <- function(step1, step2) {
-  ref_distr  <- table(step1$datB_imp1$Z1)
-  synt_distr <- table(step2$datA_fused_2$Z1)
+sm_quality <- function(Z_obs, Z_fused) {
+  ref_distr  <- table(Z_obs)
+  synt_distr <- table(Z_fused)
 
   heli_latent <- comp.prop(
     p1 = synt_distr,
     p2 = ref_distr,
-    n1 = nrow(step1$datA_imp1),
+    n1 = length(Z_obs),
     n2 = NULL,
     ref = TRUE
   )
@@ -934,14 +1186,15 @@ sm_quality <- function(step1, step2) {
     synt_distr = synt_distr
   )
 }
+
 #' Dataset datA
 #'
 #' A simple dataset with categorical variables.
 #'
 #' @format A data frame with 20 observations and 2 variables:
 #' \describe{
-#'   \item{X}{Category (e.g., "F", "M")}
-#'   \item{Y1}{Color category (e.g., "blue")}
+#'   \item{gender}{Category "F", "M"}
+#'   \item{color}{Color category "blue", "green", "red"}
 #' }
 #' @source Simulated data
 "datA"
@@ -950,10 +1203,24 @@ sm_quality <- function(step1, step2) {
 #'
 #' A simple dataset with categorical variables.
 #'
-#' @format A data frame with 15 observations and 2 variables:
+#' @format A data frame with 25 observations and 2 variables:
 #' \describe{
-#'   \item{X}{Category (e.g., "F", "M")}
-#'   \item{Z1}{Color category (e.g., "red", "green", "blue")}
+#'   \item{gender}{Category "F", "M"}
+#'   \item{targetB}{Letter category "d", "e", "f"}
 #' }
 #' @source Simulated data
 "datB"
+
+#' Dataset datC
+#'
+#' A simple dataset with categorical variables.
+#'
+#' @format A data frame with 30 observations and 3 variables:
+#' \describe{
+#'   \item{gender}{Category "F", "M"}
+#'   \item{color}{Color category "blue", "green", "red"}
+#'   \item{targetB}{Letter category "d", "e", "f"}
+#' }
+#' @source Simulated data
+"datC"
+

@@ -4,21 +4,19 @@
 \alias{smc_step1}
 \title{SMC step 1: selection of best imputed dataset}
 \usage{
-smc_step1(datA, datB, output_ll)
+smc_step1(datAB, output_ll)
 }
 \arguments{
-\item{datA}{data.frame A}
-
-\item{datB}{data.frame B}
+\item{datAB}{data.frame of the class datAB_SM return by the function \code{datAB_to_SM}}
 
 \item{output_ll}{list with imputed datasets (impdata)}
 }
 \value{
 A list with imputed datasets:
 \describe{
-\item{datAB_imp1}{The full imputed dataset obtained after combining A and B.}
-\item{datA_imp1}{Subset of \code{datAB_imp1} corresponding to dataset A.}
-\item{datB_imp1}{Subset of \code{datAB_imp1} corresponding to dataset B.}
+\item{datAB_imp}{The full imputed dataset obtained after combining A and B.}
+\item{datA_imp}{Subset of \code{datAB_imp} corresponding to dataset A.}
+\item{datB_imp}{Subset of \code{datAB_imp} corresponding to dataset B.}
 }
 }
 \description{
@@ -32,7 +30,7 @@ if (requireNamespace("NPBayesImputeCat", quietly = TRUE)) {
   data(datA)
   data(datB)
 
-  datAB <- datAB_to_SM(datA, datB)
+  datAB <- datAB_to_SM(datA, datB, "color", "targetB")
 
   # call DPMPM (reduced settings for speed)
   output_list <- NPBayesImputeCat::DPMPM_nozeros_imp(
@@ -48,9 +46,9 @@ if (requireNamespace("NPBayesImputeCat", quietly = TRUE)) {
     silent = TRUE
   )
 
-  step_first <- smc_step1(datA, datB, output_list)
-  str(step_first$datA_imp1)
-  str(step_first$datB_imp1)
+  step_first <- smc_step1(datAB, output_list)
+  str(step_first$datA_imp)
+  str(step_first$datB_imp)
 }
 }
 \references{

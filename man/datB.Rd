@@ -5,10 +5,10 @@
 \alias{datB}
 \title{Dataset datB}
 \format{
-A data frame with 15 observations and 2 variables:
+A data frame with 25 observations and 2 variables:
 \describe{
-\item{X}{Category (e.g., "F", "M")}
-\item{Z1}{Color category (e.g., "red", "green", "blue")}
+\item{gender}{Category "F", "M"}
+\item{targetB}{Letter category "d", "e", "f"}
 }
 }
 \source{

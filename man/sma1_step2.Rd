@@ -14,6 +14,7 @@ A list with:
 \describe{
 \item{datA_fused_2}{The final fused dataset A.}
 \item{out_nndd}{NNDD matching results.}
+\item{match.vars}{Matching variables in the nearest-neighbour distance matching procedure.}
 }
 }
 \description{
@@ -25,15 +26,9 @@ if (requireNamespace("NPBayesImputeCat", quietly = TRUE)) {
   data(datA)
   data(datB)
 
-  datAB <- datAB_to_SM(datA, datB)
-  datC <- data.frame(
-    X = datB$X[1:4],
-    Y1 = datA$Y1[1:4],
-    Z1 = datB$Z1[1:4]
-  )
+  data(datC)
 
-  # adding auxiliary information
-  datABC <- rbind(datAB, datC)
+  datABC <- datABC_to_SM(datA, datB, datC, "color", "targetB")
 
   # call DPMPM (reduced settings for speed)
   output_list_AII <- NPBayesImputeCat::DPMPM_nozeros_imp(
@@ -49,7 +44,8 @@ if (requireNamespace("NPBayesImputeCat", quietly = TRUE)) {
     silent = TRUE
   )
 
-  step_first_aii <- sma_step1(datA, datB, datC, output_list_AII)
+  step_first_aii <- sma_step1(datABC, output_list_AII)
+  set.seed(1234)
   step_second_aii1 <- sma1_step2(step_first_aii)
 
   result_aii1 <- step_second_aii1$datA_fused_2

@@ -4,17 +4,17 @@
 \alias{sm_quality}
 \title{Quality assessment of synthetic Z1}
 \usage{
-sm_quality(step1, step2)
+sm_quality(Z_obs, Z_fused)
 }
 \arguments{
-\item{step1}{output from \code{smc_step1()}}
+\item{Z_obs}{the variable Z_obs from datB}
 
-\item{step2}{output from step 2 method}
+\item{Z_fused}{the variable Z_fused from step2$datA_fused_2}
 }
 \value{
 A list with:
 \describe{
-\item{heli_latent}{A numeric value representing the Hellinger distance between the reference and synthetic distributions.}
+\item{heli_latent}{The complete list returned by \code{StatMatch::comp.prop()}, containing \code{meas}, \code{chi.sq}, and \code{p.exp}. The Hellinger distance is available as \code{heli_latent$meas["Hell"]}.}
 \item{ref_distr}{A numeric vector or table representing the reference (original) distribution.}
 \item{synt_distr}{A numeric vector or table representing the synthetic (generated) distribution.}
 }

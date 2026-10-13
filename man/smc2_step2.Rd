@@ -14,9 +14,10 @@ A list with:
 \describe{
 \item{datA_fused_2}{A data frame containing the final fused (imputed) version of dataset A.}
 \item{out_nndd}{A list with results from the nearest-neighbour distance matching procedure.}
+\item{match_vars}{Matching variables in the nearest-neighbour distance matching procedure.}
 \item{model_form}{A formula object used to fit the models.}
-\item{FitteddatA_imp1}{A data frame of fitted values obtained from the model for dataset A.}
-\item{FitteddatB_imp1}{A data frame of fitted values obtained from the model for dataset B.}
+\item{fitA}{A data frame of fitted values obtained from the model for dataset A.}
+\item{fitB}{A data frame of fitted values obtained from the model for dataset B.}
 }
 }
 \description{
@@ -28,7 +29,7 @@ if (requireNamespace("NPBayesImputeCat", quietly = TRUE)) {
   data(datA)
   data(datB)
 
-  datAB <- datAB_to_SM(datA, datB)
+  datAB <- datAB_to_SM(datA, datB, "color", "targetB")
 
   # call DPMPM (reduced settings for speed)
   output_list <- NPBayesImputeCat::DPMPM_nozeros_imp(
@@ -44,7 +45,8 @@ if (requireNamespace("NPBayesImputeCat", quietly = TRUE)) {
     silent = TRUE
   )
 
-  step_first <- smc_step1(datA, datB, output_list)
+  step_first <- smc_step1(datAB, output_list)
+  set.seed(1234)
   step_second <- smc2_step2(step_first)
 
   result <- step_second$datA_fused_2
