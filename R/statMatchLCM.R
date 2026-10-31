@@ -536,7 +536,7 @@ smc2_step2 <- function(step1){
   out_nndd <- NND.hotdeck(
     data.rec = cbind(datA_imp, fitA),
     data.don = cbind(datB_imp, fitB),
-    dist.fun = "Gower",
+    dist.fun = "Euclidean",
     match.vars = match.vars
   )
 
@@ -1007,7 +1007,7 @@ sma2_step2 <- function(step1){
   out_nnd <- NND.hotdeck(
     data.rec  = cbind(datA_imp, fitA),
     data.don  = cbind(datC, fitC),
-    dist.fun = "Gower",
+    dist.fun = "Euclidean",
     match.vars = match.vars
   )
 
